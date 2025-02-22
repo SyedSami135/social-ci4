@@ -8,6 +8,8 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class CommentsController extends BaseController
 {
+
+
     public function index($id)
     {
         $commentModel = new CommentModel();
@@ -17,40 +19,32 @@ class CommentsController extends BaseController
 
     public function create($id)
     {
+        $session = session(); // No need to use Services::session() within a controller
+        $userId = $session->get('userId');
+
         $commentModel = new CommentModel();
         $data = [
             'post_id' => $id,
-            'user_id' => 1,
+            'user_id' => $userId,
             'comment' => $this->request->getPost('comment'),
         ];
         $commentModel->insert($data);
-        return $this->response->setStatusCode(ResponseInterface::HTTP_CREATED)->setJSON([
-            "message" => "Comment created successfully.",
-            'data' => [
-                ...$data,
-                'comment_id' => $commentModel->insertID(),  // Returning the ID of the newly created post
-
-            ]
-        ]);
+        return sendResponse([...$data, 'comment_id' => $commentModel->insertID()], "Comment created successfully.");
     }
 
     public function update($id)
     {
         $commentModel = new CommentModel();
-       
+
 
         $comment = $commentModel->find($id);
         if (!$comment) {
-            return $this->response->setStatusCode(ResponseInterface::HTTP_NOT_FOUND)->setJSON([
-                "message" => "Comment not found."
-            ]);
+            return sendError("Comment not found.", ResponseInterface::HTTP_NOT_FOUND);
         }
 
         $newComment = $this->request->getPost('comment');
         if (empty($newComment)) {
-            return $this->response->setStatusCode(ResponseInterface::HTTP_BAD_REQUEST)->setJSON([
-                "message" => "Comment cannot be empty."
-            ]);
+            return sendError("Comment cannot be empty.", ResponseInterface::HTTP_BAD_REQUEST);
         }
 
         $data = [
@@ -60,32 +54,30 @@ class CommentsController extends BaseController
         try {
             $commentModel->update($id, $data);
         } catch (\Exception $e) {
-            return $this->response->setStatusCode(ResponseInterface::HTTP_NOT_FOUND)->setJSON([
-                "message" => $e->getMessage()
-            ]);
+            return sendError("Something went wrong.", ResponseInterface::HTTP_INTERNAL_SERVER_ERROR, $e->getMessage());
         }
 
-        return $this->response->setJSON([
-            "message" => "Comment updated successfully.",
-            "data" => $data
-        ]);
+        return sendResponse($data, "Comment updated successfully.");
     }
 
 
     public function delete($id)
     {
+
+        $session = session(); // No need to use Services::session() within a controller
+        $userId = $session->get('userId');
         $commentModel = new CommentModel();
         $comment = $commentModel->find($id);
         if (!$comment) {
-            return $this->response->setStatusCode(ResponseInterface::HTTP_NOT_FOUND)->setJSON([
-                "message" => "Comment not found."
-            ]);
+            return sendError("Comment not found.", ResponseInterface::HTTP_NOT_FOUND,);
+        }
+
+        if ($comment['user_id'] != $userId) {
+            return sendError("You are not allowed to delete this comment.", ResponseInterface::HTTP_FORBIDDEN);
         }
 
         $commentModel->delete($id);
 
-        return $this->response->setJSON([
-            "message" => "Comment deleted successfully."
-        ]);
+        return sendResponse($comment, "Comment deleted successfully.");
     }
 }

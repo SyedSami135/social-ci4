@@ -34,11 +34,11 @@ class AuthFilter implements FilterInterface
     {
 
         $authHeader = $request->getHeaderLine('Authorization');
+        
 
 
         if (!$authHeader || strpos($authHeader, 'Bearer ') !== 0) {
-            return Services::response()->setStatusCode(401, 'Unauthorized')
-                ->setJSON(['error' => 'No token provided or invalid format']);
+            return  redirect()->to('/users/login')->with('message', 'Unauthorized');
         }
 
 
@@ -47,12 +47,17 @@ class AuthFilter implements FilterInterface
         try {
 
             $decoded = JWT::decode($jwt, new Key($this->secretKey, 'HS256'));
+            if ($decoded->exp < time()) {
+                return  redirect()->to('/users/login')->with('message', 'Invalid token');
+            }
 
             $request->userId = $decoded->id;
+            
+            $session = Services::session();
+            $session->set('userId', $decoded->id);
         } catch (\Exception $e) {
 
-            return Services::response()->setStatusCode(401, 'Unauthorized')
-                ->setJSON(['error' => $e->getMessage(),]);
+            return redirect()->to('/users/login')->with('message', 'Unauthorized');
         }
     }
 

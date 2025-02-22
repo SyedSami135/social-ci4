@@ -11,7 +11,17 @@ use function App\Helpers\verifyPassword;
 
 class UserController extends BaseController
 {
-    private $secretKey = 'your_secret_key';
+
+
+    public function registerForm()
+    {
+        return view('auth/register');
+    }
+    public function loginForm()
+    {
+        return view('auth/login');
+    }
+
     public function register()
     {
         $username = $this->request->getPost('username');
@@ -20,22 +30,20 @@ class UserController extends BaseController
 
         // Basic validation
         if (empty($username) || empty($email) || empty($password)) {
-            return $this->response->setStatusCode(400, 'Bad Request')
-                ->setJSON(['error' => 'All fields are required.']);
+            return  sendError(400, 'All fields are required.');
         }
 
         // Check if email already exists
         $userModel = new UserModel();
         if ($userModel->emailExists($email)) {
-            return $this->response->setStatusCode(400, 'Bad Request')
-                ->setJSON(['error' => 'Email is already taken.']);
+            return sendError(409, 'Email already exists.');
         }
 
         // Prepare data for insertion
         $userData = [
             'username' => $username,
             'email' => $email,
-            'password' => $password,  // Password will be hashed automatically
+            'password' => $password,
         ];
 
         // Insert the new user into the database
@@ -43,12 +51,10 @@ class UserController extends BaseController
 
         if ($result) {
             // Return success response
-            return $this->response->setStatusCode(201, 'Created')
-                ->setJSON(['message' => 'User registered successfully.']);
+            return redirect()->to('/users/login')->with('message', 'User registered successfully.');
         } else {
             // Error response
-            return $this->response->setStatusCode(500, 'Internal Server Error')
-                ->setJSON(['error' => 'Failed to register user.']);
+            return redirect()->to('/users/login')->with('message', 'User registration failed.');
         }
     }
     public function login()
@@ -57,70 +63,37 @@ class UserController extends BaseController
         $email = $this->request->getPost('email');
         $password = $this->request->getPost('password');
 
-
-
-
         // Validate the request body
         if (empty($email) || empty($password)) {
-            return $this->response->setStatusCode(400, 'Bad Request')
-                ->setJSON(['error' => 'Both email and password are required.']);
+            return sendError(400, 'All fields are required.');
         }
 
         // Check if email exists
         $userModel = new UserModel();
-
         $user = $userModel->getUserByEmail($email);
 
         if (!$user) {
-            return $this->response->setStatusCode(401, 'Unauthorized')
-                ->setJSON(['error' => 'Invalid email or password.']);
+            return sendError(404, 'User not found.');
         }
 
-        echo $user['id'];
-
-        
-        $iat = time(); // current timestamp value
-        $exp = $iat + 3600*24; // 1 day expiration
- 
-        $payload = array(
-            "iss" => "Issuer of the JWT",
-            "aud" => "Audience that the JWT",
-            "sub" => "Subject of the JWT",
-            "iat" => $iat, //Time the JWT issued at
-            "exp" => $exp, // Expiration time of token
-            "id" => $user['id'],
-        );
-         
-        $token = JWT::encode($payload, $this->secretKey, 'HS256');
-
-        unset($user['password']);
-
-        return $this->response->setStatusCode(200, 'OK')
-        ->setJSON([
-            'message' => 'Login successful.',
-            'user' => $user,
-            'token' => $token,
-        ]);
-
+        // Generate JWT token
+        $token = createJWT($user['id']);
 
         // Verify the password
-        if (!verifyPassword($password, $user->password)) {
-            return $this->response->setStatusCode(401, 'Unauthorized')
-                ->setJSON(['error' => 'Invalid email or password.']);
+        if (!verifyPassword($password, $user['password'])) {
+            return sendError(401, 'Invalid password.');
         }
-
-        try {
-            $jwt =  createJWT($user->id, $this->secretKey);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500, 'Internal Server Error')
-                ->setJSON(['error' => 'Could not generate JWT token.', 'message' => $e->getMessage()]);
-        }
+        // Remove the password from the user object
+        unset($user['password']);
 
         // Return the success response with the token
         return $this->response->setStatusCode(200, 'OK')
+            ->setCookie('token', $token, 3600 * 4)
+            ->setHeader('Authorization', 'Bearer ' . $token)
             ->setJSON([
                 'message' => 'Login successful.',
-                'token' => $jwt,
+                'user' => $user,
+                'token' => $token,
             ]);
     }
 }

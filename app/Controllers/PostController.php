@@ -9,9 +9,9 @@ class PostController extends BaseController
 {
     public function index()
     {
-        $userId = $this->request->userId;
-        echo $userId;
-        echo "userId";
+        $session = session(); // No need to use Services::session() within a controller
+        $userId = $session->get('userId');
+
         $postModel = new PostModel();
         $posts = $postModel->findByUserId($userId);
 
@@ -25,7 +25,9 @@ class PostController extends BaseController
     {
         $title = $this->request->getPost('title');
         $content = $this->request->getPost('content');
-        $userId = $this->request->userId;
+        $session = session(); // No need to use Services::session() within a controller
+        $userId = $session->get('userId');
+
 
         // Validate input data
         if (empty($title) || empty($content)) {
@@ -68,7 +70,9 @@ class PostController extends BaseController
 
 
         $post = new PostModel();
-        $userId = $this->request->userId;
+        $session = session(); // No need to use Services::session() within a controller
+        $userId = $session->get('userId');
+
 
         if (!$post->findById($id)) {
             return $this->response->setStatusCode(404, 'Not Found')

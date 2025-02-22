@@ -6,8 +6,10 @@ use Firebase\JWT\JWT;
 
 
 
-function createJWT($userId, $secretKey, $expirationTime = 3600) {
+function createJWT($userId,  $expirationTime = 3600): string
+{
     $issuedAt = time();
+    $secretKey = env('JWT_SECRET_KEY');
     $payload = [
         'iat' => $issuedAt,
         'exp' => $issuedAt + $expirationTime,
@@ -21,7 +23,9 @@ function createJWT($userId, $secretKey, $expirationTime = 3600) {
     }
 }
 
-function verifyJWT($jwt, $secretKey) {
+function verifyJWT($jwt)
+{
+    $secretKey = env('JWT_SECRET_KEY');
     try {
         return JWT::decode($jwt, $secretKey);
     } catch (\Exception $e) {
