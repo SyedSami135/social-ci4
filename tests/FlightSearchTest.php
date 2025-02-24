@@ -2,7 +2,7 @@
 
 namespace Tests\Libraries;
 
-use App\Libraries\FlightSearchService;
+use App\Libraries\FlightService;
 use CodeIgniter\Test\CIUnitTestCase;
 
 
@@ -12,7 +12,7 @@ class FlightSearchTest extends CIUnitTestCase
 
     public function testSearchFlightSuccess()
     {
-        $flightService = new FlightSearchService();
+        $flightService = new FlightService();
 
         $req = (object)[
             'outboundDeparture' => 'LGW',
@@ -37,7 +37,7 @@ class FlightSearchTest extends CIUnitTestCase
 
     public function testSearchFlightWithAirlines()
     {
-        $flightService = new FlightSearchService();
+        $flightService = new FlightService();
         $req = (object)[
             // ... other required fields
             'airlines' => ['KL', 'BA'],
@@ -52,7 +52,7 @@ class FlightSearchTest extends CIUnitTestCase
 
     public function testSearchFlightWithOptions()
     {
-        $flightService = new FlightSearchService();
+        $flightService = new FlightService();
         $req = (object)[
             // ... other required fields
             'options' => [
@@ -68,7 +68,7 @@ class FlightSearchTest extends CIUnitTestCase
 
     public function testSearchFlightWithPassengers()
     {
-        $flightService = new FlightSearchService();
+        $flightService = new FlightService();
         $req = (object)[
             // ... other required fields ...
             'passengers' => [
@@ -87,7 +87,7 @@ class FlightSearchTest extends CIUnitTestCase
     public function testSearchFlightCurlError()
     {
         // Mock the storefront URL to an invalid one to force a cURL error.
-        $flightService = new FlightSearchService();
+        $flightService = new FlightService();
         $flightService->storefrontUrl = 'http://invalid-url.example.com'; // Invalid URL
 
         $req = (object)[

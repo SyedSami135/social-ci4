@@ -2,17 +2,14 @@
 
 namespace App\Libraries;
 
-class FlightSearchService
+use SimpleXMLElement;
+
+class FlightService
 {
     public $storefrontUrl = 'https://abc.xyz.com';
     protected $clientId = '4128510421209355';
     protected $secret   = '097299568043040b93824bd7a965ff6f';
-    /**
-     * Execute the flight search.
-     *
-     * @param object $req A request object containing the search parameters.
-     * @return array Result array with either 'response' or 'error'.
-     */
+
     public function searchFlight($req)
     {
         // Build the endpoint URL.
@@ -116,10 +113,116 @@ class FlightSearchService
 
         curl_close($ch);
 
-        return $response;
+        // return $response;
         return $this->parseFlightSearchResponse($response);
     }
 
+    public function selectFlight($req)
+    {
+        $endpoint = $this->storefrontUrl . '/api/v16/select/flight';
+
+        // Build XML Request
+        $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="utf-8"?><SelectReq xmlns="http://vibe.travel"></SelectReq>');
+
+        // Add Flight element
+        $flight = $xml->addChild('Flight');
+        $flight->addAttribute('ID', $req->flightId);
+
+        // Add Results
+        if (!empty($req->results) && is_array($req->results)) {
+            $results = $flight->addChild('Results');
+            foreach ($req->results as $resultId) {
+                $results->addChild('Result', $resultId);
+            }
+        }
+
+        $xmlPayload = $xml->asXML();
+
+        // Prepare headers
+        $credentials = base64_encode($this->clientId . ':' . $this->secret);
+        $headers = [
+            'Content-Type: application/xml',
+            'Content-Length: ' . strlen($xmlPayload),
+            'Authorization: Basic ' . $credentials
+        ];
+
+        // Send request
+        $ch = curl_init($endpoint);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $xmlPayload);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        // return $this->sendXMLResponse($response,"SomeMsg",200);
+
+        if (curl_errno($ch)) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            return ['error' => $error];
+        }
+
+        curl_close($ch);
+
+        // return $this->parseFlightSearchResponse($response);
+        return $response;
+    }
+
+     function parseSelectionResponse($xmlResponse)
+    {
+        $xml = simplexml_load_string($xmlResponse, 'SimpleXMLElement', LIBXML_NOCDATA);
+        if ($xml === false) {
+            $errors = libxml_get_errors();
+            libxml_clear_errors();
+            return ['error' => 'Failed to parse XML response'];
+        }
+
+        $result = [
+            'BookingReference' => (string)$xml->BookingReference,
+            'Status' => (string)$xml->Status,
+            'Expires' => (string)$xml->Expires,
+            'PriceDetails' => [],
+            'Passengers' => []
+        ];
+
+        // Parse PriceDetails
+        if ($xml->PriceDetails) {
+            $result['PriceDetails'] = [
+                'Currency' => (string)$xml->PriceDetails->Currency,
+                'TotalPrice' => (string)$xml->PriceDetails->TotalPrice,
+                'BasePrice' => (string)$xml->PriceDetails->BasePrice,
+                'Tax' => (string)$xml->PriceDetails->Tax
+            ];
+        }
+
+        // Parse Passengers
+        if ($xml->Passengers) {
+            foreach ($xml->Passengers->Passenger as $passenger) {
+                $result['Passengers'][] = [
+                    'Type' => (string)$passenger['Type'],
+                    'Title' => (string)$passenger->Title,
+                    'FirstName' => (string)$passenger->FirstName,
+                    'LastName' => (string)$passenger->LastName,
+                    'DateOfBirth' => (string)$passenger->DateOfBirth
+                ];
+            }
+        }
+
+        // Parse AncillaryServices
+        if ($xml->AncillaryServices) {
+            $result['AncillaryServices'] = [];
+            foreach ($xml->AncillaryServices->Service as $service) {
+                $result['AncillaryServices'][] = [
+                    'ID' => (string)$service['ID'],
+                    'Type' => (string)$service['Type'],
+                    'Name' => (string)$service->Name,
+                    'Price' => (string)$service->Price
+                ];
+            }
+        }
+
+        return $result;
+    }
 
     protected function parseFlightSearchResponse($xmlResponse)
     {
@@ -295,4 +398,70 @@ class FlightSearchService
 
         return $result;
     }
+  
+    function xmlToJson($xmlString)
+    {
+        // Enable internal errors to catch XML parsing errors.
+        libxml_use_internal_errors(true);
+
+        // Load the XML string into a SimpleXMLElement object with CDATA support.
+        $xmlObject = simplexml_load_string($xmlString, "SimpleXMLElement", LIBXML_NOCDATA);
+
+        if ($xmlObject === false) {
+            $errors = [];
+            foreach (libxml_get_errors() as $error) {
+                $errors[] = trim($error->message);
+            }
+            libxml_clear_errors();
+            return json_encode([
+                'error'  => 'Invalid XML provided.',
+                'errors' => $errors,
+            ]);
+        }
+
+        // Convert the SimpleXMLElement object to an associative array.
+        $array = json_decode(json_encode($xmlObject), true);
+
+        // Return the JSON encoded array.
+        return json_encode($array);
+    }
+
+    function sendXMLResponse($data, $message, $code)
+    {
+        // Set the content type to XML and the HTTP response code.
+        header('Content-Type: application/xml');
+        http_response_code($code);
+
+        // Create the root XML element.
+        $xml = new SimpleXMLElement('<response/>');
+
+        // Add the message element.
+        $xml->addChild('message', htmlspecialchars($message));
+
+        // Convert the data array to XML and attach it to a 'data' node.
+        $dataNode = $xml->addChild('data');
+        $this->arrayToXML($data, $dataNode);
+
+        // Output the XML response.
+        return $xml->asXML();
+      
+    }
+
+    protected function arrayToXML($data, &$xmlData)
+    {
+        foreach ($data as $key => $value) {
+            // Use a generic name for numeric keys.
+            if (is_numeric($key)) {
+                $key = 'item';
+            }
+            // If the value is an array, create a subnode and recursively add data.
+            if (is_array($value)) {
+                $subnode = $xmlData->addChild($key);
+                $this->arrayToXML($value, $subnode);
+            } else {
+                $xmlData->addChild($key, htmlspecialchars($value));
+            }
+        }
+    }
 }
+

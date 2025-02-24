@@ -3,7 +3,8 @@
 namespace App\Controllers;
 
 use App\Controllers\BaseController;
-use App\Libraries\FlightSearchService;
+
+use App\Libraries\FlightService;
 use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\HTTP\Response;
 use CodeIgniter\HTTP\JsonResponse;
@@ -13,7 +14,6 @@ class FlightSearchController extends BaseController
 {
     public function index()
     {
-
 
         // Build a request object with search parameters.
         $req = (object)[
@@ -40,23 +40,13 @@ class FlightSearchController extends BaseController
             ]
         ];
 
-        // return sendResponse($req, "some msg");
-
-
         // Use the FlightSearchService library.
-        $flightService = new FlightSearchService();
+        $flightService = new FlightService();
         $result = $flightService->searchFlight($req);
-
-
-        echo "result:";
-        return sendError(400, "some msg",$result,);
-        // return $this->respond($result, 200);
-        // Return the result as JSON.
-        // return $result;
+        
+        return sendError(400, "some msg", $result,);
+        
     }
 
-    protected function respond($data, $status = Response::HTTP_OK, array $headers = [])
-    {
-        return new Response($data, $status, $headers);
-    }
+   
 }

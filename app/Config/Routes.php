@@ -5,6 +5,7 @@ use App\Controllers\UserController;
 use App\Controllers\CommentsController;
 use App\Controllers\FlightSearch;
 use App\Controllers\FlightSearchController;
+use App\Controllers\FlightSelectController;
 use App\Controllers\Home;
 
 use CodeIgniter\Router\RouteCollection;
@@ -14,12 +15,14 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 $routes->get("api/flight-search", [FlightSearchController::class, 'index']);
+$routes->get("api/flight-select", [FlightSelectController::class, 'index']);
 
 
 
 $routes->get('/',   [Home::class, 'index']);
 
 $routes->get('/home', [Home::class, 'home']);
+$routes->get('/dd', [Home::class, 'getFlights']);
 
 $routes->group('users', function ($routes) {
     $routes->get('register', [UserController::class, 'registerForm']);
